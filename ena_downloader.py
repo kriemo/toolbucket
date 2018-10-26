@@ -7,7 +7,11 @@ import urllib.request
 import urllib.error
 from subprocess import call
 
+""" Utility to download fastq and metadata files from ENA database using
+just the project identifier (i.e SRX.... or PRJN....)
 
+Uses either wget (slow) or aspera (fast)
+"""
 
 def get_study_metadata(study_id, logfile):
   
@@ -57,12 +61,16 @@ def download_files(metadata, fq_ids, dl_prog, dl_prog_path, ssh_key,
 
   header = metadata.pop(0)
   
-  if len(fq_ids) > 0:
-      filter_fqs = True
+  if fq_ids:
+    filter_fqs = True
+  else:
+    filter_fqs = False
+
   for line in metadata:
      accession, title, ftp_url, ascp_url = line.rstrip().split("\t")
 
-     if accession not in fq_ids:
+     if filter_fqs:
+       if accession not in fq_ids:
          continue
 
      ftp_urls = ftp_url.split(";")
