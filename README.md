@@ -6,7 +6,7 @@ A collection of utility scripts
 
 Download metadata and fastqs from the European Nucleotide Archive using `aspera` or `wget`
  
-```bash
+```
 python3 ena_downloader.py -h
 
 usage: ena_downloader.py [-h] -s STUDY [-i IDS [IDS ...]] [-d DOWNLOADER]
@@ -27,7 +27,7 @@ optional arguments:
                         either 'ascp' or 'wget' (default)
   -p PROG_PATH, --prog_path PROG_PATH
                         path to downloader binary, defaults to name of
-                        program, i.e. 'ascp', 'wget' '
+                        program, i.e. 'ascp', 'wget' 
   -k SSHKEY, --sshkey SSHKEY
                         path to aspera openssh key file (i.e something like
                         ".aspera/connect/etc/asperaweb_id_dsa.openssh")
