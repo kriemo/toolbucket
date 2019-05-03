@@ -72,5 +72,6 @@ if __name__ == '__main__':
     else:
         gtf_to_bed(input_gtf, attributes,"NA", outfh, args.feature)
     
-output_bed.close() 
 
+    if args.output_bed: 
+        outfh.close() 
