@@ -157,9 +157,8 @@ def main():
   
   parser.add_argument('-m',
                       '--metadatafile',
-                      help ="""filename for log file containing metadata
-                      downloaded for study. defaults to study name +
-                      "_metadata.txt" in outdir
+                      help ="""
+                      preparsed metadata file for downloading
                       """,
                    required = False)
 
@@ -171,7 +170,6 @@ def main():
   dl_prog_path = args.prog_path
   ssh_key = args.sshkey
   output_dir = args.outputdir 
-  log_fn = args.metadatafile
 
   if dl_prog == "ascp" and ssh_key is None:
     sys.exit("-k required for using aspera")
@@ -184,13 +182,17 @@ def main():
   else:
     output_dir = "."
   
-  if log_fn:
-      logfile = os.path.join(output_dir, log_fn)
-  else:
-      logfile = os.path.join(output_dir, study_id + "_download_log.txt")
+  logfile = os.path.join(output_dir, study_id + "_download_log.txt")
 
   log_fp = open(logfile, 'w')
-  mdata = get_study_metadata(study_id, log_fp)
+
+  if args.metadatafile:
+      mdata = []
+      with open(args.metadatafile) as f:
+          for line in f:
+              mdata.append(line)
+  else:
+      mdata = get_study_metadata(study_id, log_fp)
   
   download_files(mdata,
           fq_ids,
