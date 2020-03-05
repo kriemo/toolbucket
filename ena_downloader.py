@@ -74,6 +74,12 @@ def download_files(metadata, fq_ids, dl_prog, dl_prog_path, ssh_key,
          continue
 
      ftp_urls = ftp_url.split(";")
+     for i,furl in enumerate(ftp_urls):
+         if furl.startswith('ftp://'):
+             pass
+         else:
+             ftp_urls[i] =  "ftp://" + furl 
+     
      ascp_urls = ascp_url.split(";")
      
      if len(ftp_urls) == 2 and len(ascp_urls) == 2:
