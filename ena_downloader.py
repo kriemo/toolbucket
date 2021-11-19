@@ -13,21 +13,70 @@ just the project identifier (i.e SRX.... or PRJN....)
 Uses either wget (slow) or aspera (fast)
 """
 
-def get_study_metadata(study_id, logfile):
+# mdata values to capture
+mdata_vals = {"study_accession",
+  "secondary_study_accession",
+  "sample_accession",
+  "experiment_accession",
+  "run_accession",
+  "tax_id",
+  "scientific_name",
+  "experiment_title",
+  "study_title",
+  "fastq_ftp",
+  "fastq_aspera",
+  "submitted_ftp",
+  "submitted_format",
+  "sra_ftp",
+  "sample_title"}
+
+def format_metadata(mdata):
+  "format mdata file into dictionary, run_accession will be key"
+  
+  d = {} 
+  hdr = mdata[0].rstrip().split("\t")
+  
+  required_cols = ["sample_title", "fastq_ftp", "fastq_aspera"]
+  if not all([x in hdr for x in required_cols]):
+      out_str = ",".join(required_cols)
+      sys.exit(f"unable to find required metadata columns {out_str}")
+  
+  for line in mdata[1:]:
+      vals = line.rstrip().split("\t")
+      sample_dict = {}
+      for idx,val in enumerate(vals):
+          val_type = hdr[idx]
+          if val_type == "run_accession":
+              run_key = val
+          else:
+              sample_dict[val_type] = val
+      d[run_key] = sample_dict        
+  
+  return d
+
+    
+def get_study_metadata(study_id, logfile, mdata_vals):
   
   baseurl = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession="
-  fields_url = "&result=read_run&fields=run_accession,sample_title,fastq_ftp,fastq_aspera"
-  
-  full_url = baseurl + study_id + fields_url
+  fields_url = "&result=read_run&fields="
+  fields = ",".join(list(mdata_vals))
+  full_url = baseurl + study_id + fields_url + fields
 
   # get study info
   try: 
+    fp = urllib.request.urlopen(full_url)
+  except:
+    pass
+  
+  try:
+    new_url = "https://www.ebi.ac.uk/ena/portal/api/filereport?accession="
+    full_url = new_url + study_id + fields_url + fields
     fp = urllib.request.urlopen(full_url)
   except urllib.error.HTTPError as e:
       sys.exit("unable to retrieve study from ENA: error {}".format(e.code)) 
   except urllib.error.URLError as e:
       sys.exit("unable to retrieve study from ENA: error {}".format(e.reason)) 
-  
+    
   mdata = []
   for line in fp:
     line = line.decode("utf8")
@@ -39,7 +88,9 @@ def get_study_metadata(study_id, logfile):
   if len(mdata) < 2:
       # ENA will return only headers with some input strings
       sys.exit("unable to retrieve study from ENA")
-  
+
+  mdata = format_metadata(mdata)
+
   return mdata
 
 def download_files(metadata, fq_ids, dl_prog, dl_prog_path, ssh_key,
@@ -59,28 +110,25 @@ def download_files(metadata, fq_ids, dl_prog, dl_prog_path, ssh_key,
     dl_prog_path
   ]
 
-  header = metadata.pop(0)
-  
   if fq_ids:
     filter_fqs = True
   else:
     filter_fqs = False
 
-  for line in metadata:
-     accession, title, ftp_url, ascp_url = line.rstrip().split("\t")
+  for k,v in metadata.items():
 
      if filter_fqs:
-       if accession not in fq_ids:
+       if k not in fq_ids:
          continue
 
-     ftp_urls = ftp_url.split(";")
+     ftp_urls = v["fastq_ftp"].split(";")
      for i,furl in enumerate(ftp_urls):
          if furl.startswith('ftp://'):
              pass
          else:
              ftp_urls[i] =  "ftp://" + furl 
      
-     ascp_urls = ascp_url.split(";")
+     ascp_urls = v["fastq_aspera"].split(";")
      
      if len(ftp_urls) == 2 and len(ascp_urls) == 2:
          libtype = "paired_end"
@@ -109,7 +157,7 @@ def download_files(metadata, fq_ids, dl_prog, dl_prog_path, ssh_key,
 
      
      for cmd in dl_cmds:
-       print("downloading sample {} from accession {}".format(accession, title))
+       print("downloading sample {} from accession {}".format(k, v["sample_title"]))
        print(" ".join(cmd))
        call(cmd)
 
@@ -160,6 +208,13 @@ def main():
                       to '.' """,
                       default = ".",
                    required = False)
+  parser.add_argument('-M',
+                      '--metadata-vals',
+                      help ="""
+                      additional attributes to add to metadata table 
+                      supply as space deliminated values""",
+                      nargs = "+",
+                   required = False)
   
   parser.add_argument('-m',
                       '--metadatafile',
@@ -176,7 +231,7 @@ def main():
   dl_prog_path = args.prog_path
   ssh_key = args.sshkey
   output_dir = args.outputdir 
-
+   
   if dl_prog == "ascp" and ssh_key is None:
     sys.exit("-k required for using aspera")
   if dl_prog_path is None:
@@ -191,6 +246,10 @@ def main():
   logfile = os.path.join(output_dir, study_id + "_download_log.txt")
 
   log_fp = open(logfile, 'w')
+  
+  if args.metadata_vals:
+      for i in args.metadata_vals:
+          mdata_vals.add(i)
 
   if args.metadatafile:
       mdata = []
@@ -198,7 +257,7 @@ def main():
           for line in f:
               mdata.append(line)
   else:
-      mdata = get_study_metadata(study_id, log_fp)
+      mdata = get_study_metadata(study_id, log_fp, mdata_vals)
   
   download_files(mdata,
           fq_ids,
